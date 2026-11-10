@@ -25,15 +25,18 @@
       eventsEl.innerHTML = '<div class="empty-state dark-empty">Upcoming programmes and events will appear here after the school publishing database is connected.</div>';
       return;
     }
-    const [newsResult, eventResult] = await Promise.all([
+    const [newsResult, eventResult, galleryResult] = await Promise.all([
       db.from("school_news").select("*").eq("published", true).order("created_at", {ascending:false}).limit(6),
-      db.from("school_events").select("*").eq("published", true).order("event_date", {ascending:true}).limit(8)
+      db.from("school_events").select("*").eq("published", true).order("event_date", {ascending:true}).limit(8),
+      db.from("school_gallery").select("id,title,caption,image_url,created_at").eq("published", true).order("created_at", {ascending:false}).limit(18)
     ]);
     if (newsResult.error) newsEl.innerHTML = '<div class="empty-state">News could not be loaded. Please try again later.</div>';
     else renderNews(newsResult.data || []);
     if (eventResult.error) eventsEl.innerHTML = '<div class="empty-state dark-empty">Programmes could not be loaded at this time.</div>';
     else renderEvents(eventResult.data || []);
-    renderGallery((newsResult.data || []).filter(item => item.image_url).slice(0,3));
+    if (galleryResult.error) {
+      document.getElementById("galleryGrid").innerHTML = '<div class="empty-state">The photo gallery is being set up. Please check again soon.</div>';
+    } else renderGallery(galleryResult.data || []);
   }
 
   function renderNews(items) {
@@ -52,10 +55,18 @@
       <div class="event-place">${escapeHtml(item.venue || "School venue to be confirmed")}</div></article>`).join("");
   }
   function renderGallery(items) {
-    if (!items.length) return;
-    document.getElementById("galleryGrid").innerHTML = items.map((item,i) => `
-      <div class="gallery-placeholder" style="background:linear-gradient(0deg,rgba(10,40,25,.55),transparent),url('${escapeHtml(item.image_url)}') center/cover">
-      <strong style="color:white">${escapeHtml(item.title)}</strong></div>`).join("");
+    const grid = document.getElementById("galleryGrid");
+    if (!items.length) {
+      grid.innerHTML = '<div class="gallery-placeholder"><span>✦</span><strong>School photographs will appear here</strong></div>';
+      return;
+    }
+    grid.innerHTML = items.map(item => `
+      <figure class="gallery-placeholder" style="margin:0;overflow:hidden;position:relative">
+        <img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.title)}" loading="lazy" style="width:100%;height:100%;min-height:220px;object-fit:cover;display:block">
+        <figcaption style="position:absolute;left:0;right:0;bottom:0;padding:18px;color:white;background:linear-gradient(transparent,rgba(10,40,25,.82))">
+          <strong>${escapeHtml(item.title)}</strong>${item.caption ? `<span style="display:block;font-size:12px;margin-top:4px">${escapeHtml(item.caption)}</span>` : ""}
+        </figcaption>
+      </figure>`).join("");
   }
   loadContent();
 })();
